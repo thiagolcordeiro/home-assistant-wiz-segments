@@ -10,6 +10,7 @@ from homeassistant.core import callback
 
 from .const import DEFAULT_SLOT, DOMAIN, MODULE
 from .model import validate_layout
+from .layout import distribute_segments, resize_segment
 from .protocol import WizClient, WizError
 
 
@@ -54,10 +55,7 @@ class WizSegmentsFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(system["mac"].lower())
                 self._abort_if_unique_id_configured()
                 total = user_input["total_blocks"]
-                count = min(3, total)
-                segments = [{"id": uuid4().hex, "name": f"Segment {i + 1}",
-                             "start": i * total // count + 1, "end": (i + 1) * total // count}
-                            for i in range(count)]
+                segments = distribute_segments([], min(3, total), total)
                 return self.async_create_entry(title="WiZ RGBIC", data={
                     **user_input, "host": host, "segments": segments,
                 })
@@ -78,11 +76,11 @@ class SegmentOptions(config_entries.OptionsFlow):
         self.edit_id = None
 
     async def async_step_init(self, user_input=None):
-        return self.async_show_menu(step_id="init", menu_options=["add", "edit", "remove", "device", "save"])
+        return self.async_show_menu(step_id="init", menu_options=["add", "edit", "remove", "distribute", "device", "save"])
 
     def selection_schema(self):
         return vol.Schema({vol.Required("segment"): vol.In({
-            s["id"]: f"{s['name']} ({s['start']}-{s['end']})" for s in self.settings["segments"]
+            s["id"]: f"{s['name']} ({s['end'] - s['start'] + 1} blocks: {s['start']}-{s['end']})" for s in self.settings["segments"]
         })})
 
     async def async_step_add(self, user_input=None):
@@ -98,10 +96,10 @@ class SegmentOptions(config_entries.OptionsFlow):
     async def async_step_segment(self, user_input=None):
         errors = {}
         if user_input is not None:
-            segment = {**user_input, "name": user_input["name"].strip(), "id": self.edit_id or uuid4().hex}
-            candidate = [s for s in self.settings["segments"] if s["id"] != self.edit_id] + [segment]
             try:
-                validate_layout(candidate, self.settings["total_blocks"])
+                candidate = resize_segment(self.settings["segments"], self.edit_id or uuid4().hex,
+                                           user_input["name"], user_input["start"], user_input["blocks"],
+                                           self.settings["total_blocks"], user_input["auto_arrange"])
             except ValueError as err:
                 errors["base"] = str(err)
             else:
@@ -112,9 +110,24 @@ class SegmentOptions(config_entries.OptionsFlow):
         schema = vol.Schema({
             vol.Required("name", default=defaults.get("name", "Segment")): str,
             vol.Required("start", default=defaults.get("start", 1)): integer(1, self.settings["total_blocks"]),
-            vol.Required("end", default=defaults.get("end", 1)): integer(1, self.settings["total_blocks"]),
+            vol.Required("blocks", default=defaults.get("blocks", selected.get("end", 1) - selected.get("start", 1) + 1)): integer(1, self.settings["total_blocks"]),
+            vol.Required("auto_arrange", default=defaults.get("auto_arrange", True)): bool,
         })
         return self.async_show_form(step_id="segment", data_schema=schema, errors=errors)
+
+    async def async_step_distribute(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            try:
+                self.settings["segments"] = distribute_segments(self.settings["segments"],
+                                                               user_input["count"], self.settings["total_blocks"])
+            except ValueError as err:
+                errors["base"] = str(err)
+            else:
+                return await self.async_step_init()
+        schema = vol.Schema({vol.Required("count", default=len(self.settings["segments"])):
+                             integer(1, min(12, self.settings["total_blocks"]))})
+        return self.async_show_form(step_id="distribute", data_schema=schema, errors=errors)
 
     async def async_step_remove(self, user_input=None):
         errors = {}
@@ -142,7 +155,12 @@ class SegmentOptions(config_entries.OptionsFlow):
             else:
                 self.settings.update({**user_input, "host": host})
                 return await self.async_step_init()
-        return self.async_show_form(step_id="device", data_schema=settings_schema(user_input or self.settings), errors=errors)
+        defaults = user_input or self.settings
+        schema = settings_schema(defaults).extend({
+            vol.Required("effect_period", default=defaults.get("effect_period", 6)): integer(1, 60),
+            vol.Required("effect_fps", default=defaults.get("effect_fps", 2)): integer(1, 5),
+        })
+        return self.async_show_form(step_id="device", data_schema=schema, errors=errors)
 
     async def async_step_save(self, user_input=None):
         return self.async_create_entry(title="", data=self.settings)

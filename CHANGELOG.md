@@ -1,5 +1,15 @@
 # Changelog / Histórico
 
+## 0.3.0 — 2026-09-10 (experimental)
+
+- Length-based segment editing, optional automatic packing and dynamic equal distribution.
+- Rainbow, Chase, Breathe and Color loop effects, with bounded updates and shared region budget.
+- Effect tasks stop on external control, connection failure and unload. Existing IDs/settings remain compatible.
+- Edição por quantidade de blocos, organização automática opcional e distribuição dinâmica.
+- Efeitos com frequência limitada e divisão do espaço disponível no comando.
+- Interrupção em controle externo, falhas e recarga; compatibilidade com IDs e configurações existentes.
+- User confirmed 0.2.1 running in HA; new 0.3.0 behavior awaits hardware validation.
+
 ## 0.2.1 — 2026-09-10 (experimental)
 
 - Prepare public repository, MIT license, bilingual documentation, HACS metadata

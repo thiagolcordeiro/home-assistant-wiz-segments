@@ -28,22 +28,24 @@
     "step": {
       "init": {
         "title": "Configurar segmentos",
-        "description": "As alterações são aplicadas somente após Salvar. Os limites usam blocos de 6 LEDs, numerados a partir de 1.",
+        "description": "Adicione, remova ou redimensione segmentos. Um bloco tem 6 LEDs. As alterações só entram em vigor após Salvar.",
         "menu_options": {
           "add": "Adicionar segmento",
           "edit": "Editar segmento",
           "remove": "Remover segmento",
           "device": "Conexão e tamanho da fita",
-          "save": "Salvar alterações"
+          "save": "Salvar alterações",
+          "distribute": "Distribuir quantidade de segmentos"
         }
       },
       "segment": {
         "title": "Limites do segmento",
-        "description": "O bloco inicial e o final estão incluídos. Bloco 1: LEDs 1–6; bloco 2: LEDs 7–12. Reduza um segmento existente antes de criar outro nesse espaço.",
+        "description": "Informe quantos blocos o segmento ocupa. Com organização automática, os segmentos são alinhados desde o bloco 1, sem lacunas, mantendo a ordem atual; um novo segmento vai ao final. O campo Primeiro bloco é ignorado nesse modo. Sem organização automática, ele define a posição. Reduza outros segmentos se faltar espaço.",
         "data": {
           "name": "Nome",
           "start": "Primeiro bloco",
-          "end": "Último bloco"
+          "blocks": "Quantidade de blocos",
+          "auto_arrange": "Organizar segmentos automaticamente"
         }
       },
       "edit": {
@@ -65,7 +67,16 @@
         "data": {
           "host": "Endereço IP da fita",
           "total_blocks": "Quantidade de blocos físicos (6 LEDs cada)",
-          "slot": "Número do modo personalizado"
+          "slot": "Número do modo personalizado",
+          "effect_period": "Duração do ciclo do efeito (segundos)",
+          "effect_fps": "Atualizações do efeito por segundo"
+        }
+      },
+      "distribute": {
+        "title": "Distribuir a fita em segmentos",
+        "description": "Divide toda a fita igualmente na quantidade escolhida. Substitui os tamanhos e lacunas atuais. Mantém nomes e IDs dos primeiros segmentos; reduzir a quantidade remove os últimos. Revise antes de Salvar.",
+        "data": {
+          "count": "Quantidade de segmentos"
         }
       }
     },

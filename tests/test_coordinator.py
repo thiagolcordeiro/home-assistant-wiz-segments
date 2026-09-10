@@ -17,6 +17,7 @@ class HAError(Exception):
 class BaseCoordinator:
     def __init__(self, *args, **kwargs):
         self.data = None
+        self.hass = types.SimpleNamespace(async_create_background_task=lambda coro, name: asyncio.create_task(coro))
 
     def async_set_updated_data(self, data):
         self.data = data
@@ -81,7 +82,82 @@ class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
                 {"id": "a", "name": "A", "start": 1, "end": 9},
                 {"id": "b", "name": "B", "start": 10, "end": 18}]})
         self.strip = FakeStrip()
+        entry.async_create_background_task = lambda hass, coro, name, eager_start=False: asyncio.create_task(coro)
         self.coordinator = adapter.SegmentCoordinator(None, entry, self.strip, {"mac": "test"})
+
+    async def asyncTearDown(self):
+        await self.coordinator.async_stop_effects()
+
+    async def test_animation_preserves_other_segment_and_stops_for_external_scene(self):
+        await self.coordinator.async_set_segment("b", True, rgbww=(0, 0, 0, 0, 255))
+        await self.coordinator.async_set_segment("a", True, effect="Rainbow")
+        saved = deepcopy(self.coordinator.store.saved)
+        await self.coordinator._async_effect_tick()
+        self.assertEqual(self.strip.frames[-1]["elm"]["steps"][-1][4], 255)
+        self.assertEqual(self.coordinator.store.saved, saved)
+        count = len(self.strip.frames)
+        self.strip.pilot = {"state": True, "sceneId": 11}
+        await self.coordinator._async_effect_tick()
+        self.assertEqual(len(self.strip.frames), count)
+        self.assertFalse(self.coordinator.frame_known)
+        self.assertEqual(self.coordinator.effects["a"], "off")
+        self.assertIsNone(self.coordinator._effect_timer)
+
+    async def test_effect_failure_stops_without_committing_preferences(self):
+        await self.coordinator.async_set_segment("a", True, effect="Breathe")
+        saved = deepcopy(self.coordinator.states)
+        self.strip.reject = True
+        await self.coordinator._async_effect_tick()
+        self.assertEqual(self.coordinator.states, saved)
+        self.assertEqual(self.coordinator.effects["a"], "off")
+        self.assertIsNone(self.coordinator._effect_timer)
+
+    async def test_manual_color_cancels_effect_brightness_preserves_it(self):
+        await self.coordinator.async_set_segment("a", True, effect="Rainbow")
+        await self.coordinator.async_set_segment("a", True, brightness=80)
+        self.assertEqual(self.coordinator.effects["a"], "Rainbow")
+        await self.coordinator.async_set_segment("a", True, rgbww=(255, 0, 0, 0, 0))
+        self.assertEqual(self.coordinator.effects["a"], "off")
+        self.assertEqual(self.strip.frames[-1]["elm"]["steps"][0][1:4], [255, 0, 0])
+
+    async def test_shutdown_prevents_further_frames(self):
+        await self.coordinator.async_set_segment("a", True, effect="Chase")
+        await self.coordinator.async_stop_effects()
+        count = len(self.strip.frames)
+        await self.coordinator._async_effect_tick()
+        self.assertEqual(len(self.strip.frames), count)
+        self.assertIsNone(self.coordinator._effect_timer)
+        with self.assertRaises(HAError):
+            await self.coordinator.async_set_segment("a", True)
+
+    async def test_real_timer_drives_frames_and_shutdown_cancels_it(self):
+        self.coordinator.settings["effect_fps"] = 5
+        await self.coordinator.async_set_segment("a", True, effect="Rainbow")
+        await asyncio.sleep(0.25)
+        self.assertGreaterEqual(len(self.strip.frames), 2)
+        await self.coordinator.async_stop_effects()
+        count = len(self.strip.frames)
+        await asyncio.sleep(0.25)
+        self.assertEqual(len(self.strip.frames), count)
+
+    async def test_unload_cancels_in_flight_animation(self):
+        await self.coordinator.async_set_segment("a", True, effect="Rainbow")
+        entered = asyncio.Event()
+        original = self.strip.request
+
+        async def slow_request(method, params=None):
+            if method == "setPilot":
+                entered.set()
+                await asyncio.Event().wait()
+            return await original(method, params)
+
+        self.strip.request = slow_request
+        self.coordinator._effect_timer.cancel()
+        self.coordinator._start_effect_tick()
+        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.wait_for(self.coordinator.async_stop_effects(), 1)
+        self.assertIsNone(self.coordinator._effect_task)
+        self.assertIsNone(self.coordinator._effect_timer)
 
     async def test_simultaneous_commands_preserve_both_regions(self):
         await asyncio.gather(self.coordinator.async_set_segment("a", True, (255, 0, 0), 128),

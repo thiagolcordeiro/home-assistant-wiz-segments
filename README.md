@@ -2,7 +2,7 @@
 
 **English** | [Português brasileiro](README.pt-BR.md)
 
-Version 0.2.1 · [MIT license](LICENSE). Independent community project; not an official WiZ integration.
+Version 0.3.0 · [MIT license](LICENSE). Independent community project; not an official WiZ integration.
 
 Control a WiZ RGBIC strip directly by IP, with one RGBWW light entity per named
 segment. No ESP or WLED firmware is involved. Implemented independently from
@@ -84,8 +84,8 @@ Removing a region deletes its entity from the entity registry after Save.
 
 Home Assistant entities now declare the RGBWW color mode. Each action
 rebuilds the full frame while retaining other currently controlled regions.
-There are no native animations, transitions or individually addressable LEDs
-inside each group of six in this version. The standard card's controls depend
+Version 0.3.0 adds the host-generated animations documented below. Individual
+LEDs inside a six-LED block and native transition commands are not supported. The standard card's controls depend
 on the installed HA frontend; five independent sliders are not bundled here.
 
 For precise channel control, use `light.turn_on` with `rgbww_color` in the order
@@ -169,9 +169,71 @@ Find `wiz_segments` messages in **Settings → System → Logs**. Include HA and
 integration versions, module/firmware, layout and expected/observed output in
 issues. Remove IP/MAC addresses, emails and credentials from shared logs.
 
+## Segment lengths and dynamic distribution (0.3.0)
+
+In **Configure → Edit segment**, set **Number of blocks**. Each block contains
+six LEDs on the supported strip. **Auto-arrange segments** packs the existing
+segments from block 1 in their current order, preserving entity IDs and removing
+gaps. New segments are appended. With auto-arrange enabled, **First block** is
+ignored; disable it to place a segment at a specific position. The requested
+lengths must fit the physical strip: this does not create additional physical LEDs.
+
+Use **Distribute segment count** to divide the entire strip into 1–12 segments
+(also limited by installed block count). For 18 blocks, six segments have three
+blocks each. Change individual lengths afterward if desired. Distribution replaces
+previous lengths and gaps, retains the first existing names/IDs in physical order,
+and removes entities at the end when reducing the count. Changes remain staged
+until **Save changes**. Adjust automations targeting removed entities.
+
+## Animated effects (0.3.0)
+
+Each light exposes an effect list in Home Assistant:
+
+| Effect | Behavior |
+|---|---|
+| `off` | Solid configured RGBWW color; stops animation without switching off. |
+| `Rainbow` | Moving rainbow across the available regions of the segment. |
+| `Chase` | A bright region moves across a dim background in the selected RGBWW color. |
+| `Breathe` | Smoothly varying brightness using the selected RGBWW color. |
+| `Color loop` | The whole segment cycles through RGB hues. |
+
+```yaml
+action: light.turn_on
+target:
+  entity_id: light.wiz_rgbic_segment_1
+data:
+  brightness: 128
+  effect: Rainbow
+```
+
+Choose `effect: "off"` for a solid color, or call `light.turn_off` to switch the
+segment off. A color command without an explicit effect stops its animation;
+brightness-only commands retain it. Rainbow and Color loop generate their own
+RGB colors; Breathe and Chase use the configured RGBWW channels.
+
+In **Configure → Strip connection and length**, set the cycle duration (1–60 s,
+default 6) and update rate (1–5 per second, default 2). These settings apply to the
+strip's effects and require Save. Frames are sent sequentially; slower network
+responses reduce the actual rate, with no queued backlog. Per-frame animation
+data is not saved to disk or published as individual Home Assistant state changes.
+
+These are original host-generated effects inspired by common LED animations,
+not the WLED effect engine. Static regions, dark gaps and the tail reserve their
+wire steps first. Animated segments fairly share the remaining space in the
+12-region command budget. Long segments therefore animate in larger groups;
+with no spare regions, Rainbow becomes a color cycle and Chase cannot move within
+that segment. Use fewer segments/gaps for greater spatial detail. There is no
+individual control within a six-LED block and no WLED frame-rate guarantee.
+
+The HA server must remain running. Effects stop after a detected external scene,
+power-off, communication failure, reload or HA shutdown and do not resume by
+themselves. Stopping HA can leave the last transmitted colors lit. External writes
+to the same slot cannot reliably be detected. The 0.2.1 integration was confirmed
+working by its user; these new animations still need visual validation on hardware.
+
 ## Validation and remaining work
 
-All 26 offline tests passed. The frame builder and real UDP transport tests cover
+Offline tests cover the original behavior and the new layouts/effects. The frame builder and real UDP transport tests cover
 layout bounds, gaps, brightness, timeout/retry and malformed replies. Isolated
 coordinator tests check serialized concurrent writes, failed-write rollback,
 preserving other regions and no startup replay. These use minimal substitutes
@@ -184,9 +246,9 @@ payload (including dark gaps and independent brightness) still requires visual
 verification from within Home Assistant. The strip was verified off afterward.
 
 All Python files are syntax-checked with Python 3.11. The integration uses modern
-HA config entries and coordinator APIs, but has **not** been loaded in a running
-Home Assistant instance. Confirm the installed HA version before deploying in a
-production setup. No files have been installed on the user's HA server yet.
+HA config entries and coordinator APIs, and the user confirmed version 0.2.1 working in Home Assistant. The new 0.3.0
+features still require runtime and visual validation. Confirm the installed HA version before deploying in a
+production setup. The user installed and validated version 0.2.1.
 
 Run offline tests using Python 3.11+:
 

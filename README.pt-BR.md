@@ -6,10 +6,10 @@ Integração personalizada para controlar uma fita WiZ RGBIC diretamente pelo IP
 sem ESP e sem WLED. Cada segmento configurado vira uma entidade de luz no Home
 Assistant, com liga/desliga, brilho, vermelho, verde, azul, branco frio e branco quente.
 
-**Versão experimental 0.2.1.** RGB e os dois controles de branco foram confirmados
+**Versão experimental 0.3.0.** RGB e os dois controles de branco foram confirmados
 visualmente em uma WiZ 605568, módulo `ESP25_MHORGB_01`, firmware `1.38.0`.
 Os testes automatizados não substituem a validação dentro do Home Assistant,
-que ainda está pendente. Outros módulos são recusados durante a configuração.
+da nova versão. O usuário confirmou a versão 0.2.1 funcionando no Home Assistant. Outros módulos são recusados durante a configuração.
 Este projeto é independente e não é uma integração oficial da WiZ.
 
 ## Requisitos
@@ -80,7 +80,7 @@ Renomear ou redimensionar mantém a identidade da entidade; remover exclui sua
 entidade do registro depois de salvar. Ajuste automações que usem entidades removidas.
 
 O controle mínimo é um bloco de seis LEDs, sem endereçamento individual dentro
-do bloco. Esta versão não oferece animações, gradientes em movimento ou transições.
+do bloco. A versão 0.3.0 oferece as animações descritas abaixo; comandos nativos de transição não são suportados.
 
 ## Cores, brancos e brilho
 
@@ -170,6 +170,71 @@ Ao relatar problemas, inclua versões do HA e da integração, modelo/firmware,
 limites dos segmentos e resultado esperado/observado. Remova IPs, MACs, e-mails e
 tokens dos registros antes de publicar.
 
+## Tamanho e quantidade dinâmica de segmentos (0.3.0)
+
+Em **Configurar → Editar segmento**, informe **Quantidade de blocos**. Cada bloco
+contém seis LEDs na fita compatível. **Organizar segmentos automaticamente**
+alinha os segmentos desde o bloco 1, na ordem atual, preservando os IDs e eliminando
+lacunas. Novos segmentos são acrescentados ao final. Nesse modo, **Primeiro bloco**
+é ignorado; desative a organização automática para escolher uma posição específica.
+A soma precisa caber na fita: a configuração não cria LEDs físicos adicionais.
+
+Use **Distribuir quantidade de segmentos** para dividir toda a fita em 1–12
+segmentos, respeitando também a quantidade instalada de blocos. Para 18 blocos,
+seis segmentos terão três blocos cada. Depois, edite os tamanhos individualmente.
+A distribuição substitui tamanhos e lacunas anteriores, mantém os primeiros nomes
+e IDs na ordem física e remove os últimos segmentos ao reduzir a quantidade.
+Tudo fica pendente até **Salvar alterações**. Revise automações que usem entidades removidas.
+
+## Efeitos animados (0.3.0)
+
+Cada luz passa a oferecer uma lista de efeitos no Home Assistant:
+
+| Efeito | Comportamento |
+|---|---|
+| `off` | Cor RGBWW fixa; para a animação sem desligar a luz. |
+| `Rainbow` | Arco-íris em movimento nas regiões disponíveis do segmento. |
+| `Chase` | Uma região brilhante percorre um fundo fraco na cor RGBWW escolhida. |
+| `Breathe` | Variação gradual de brilho na cor RGBWW escolhida. |
+| `Color loop` | Todo o segmento percorre um ciclo de cores RGB. |
+
+```yaml
+action: light.turn_on
+target:
+  entity_id: light.wiz_rgbic_segment_1
+data:
+  brightness: 128
+  effect: Rainbow
+```
+
+Escolha `effect: "off"` para voltar à cor fixa ou use `light.turn_off` para desligar.
+Um comando de cor sem efeito explícito interrompe a animação; um comando apenas
+de brilho a mantém. Rainbow e Color loop geram suas próprias cores RGB;
+Breathe e Chase usam os canais RGBWW configurados.
+
+Em **Configurar → Conexão e comprimento da fita**, ajuste a duração do ciclo
+(1–60 segundos, padrão 6) e a frequência (1–5 atualizações por segundo, padrão 2).
+Essas opções valem para os efeitos da fita e precisam ser salvas. Quadros são
+enviados em sequência; respostas lentas reduzem a frequência real, sem acumular
+uma fila. Quadros de animação não são gravados em disco nem geram um novo estado
+do Home Assistant a cada atualização.
+
+São efeitos originais gerados pelo servidor, inspirados em animações comuns,
+sem incorporar o motor do WLED. Segmentos fixos, lacunas e cauda reservam primeiro
+suas regiões no comando. Os segmentos animados dividem o espaço restante do limite
+de 12 regiões. Por isso, trechos longos podem se mover em grupos maiores; sem
+regiões livres, Rainbow vira um ciclo de cor e Chase não consegue se deslocar
+dentro daquele segmento. Use menos segmentos/lacunas para obter mais detalhes.
+Não há controle individual dentro de um bloco de seis LEDs, nem garantia da
+mesma fluidez do WLED.
+
+O servidor HA precisa continuar funcionando. Efeitos param após detectar cena
+externa, desligamento, falha de comunicação, recarga ou encerramento do HA, sem
+retomada automática. Ao parar o HA, as últimas cores enviadas podem continuar
+acesas. Alterações externas no mesmo modo não são detectadas com segurança.
+A versão 0.2.1 foi confirmada funcionando pelo usuário; as novas animações ainda
+precisam de validação visual na fita.
+
 ## Desenvolvimento e licença
 
 ```text
@@ -177,10 +242,10 @@ python -m unittest discover -s tests -v
 python tools/validate_release.py
 ```
 
-Os 26 testes locais cobrem quadros RGBWW, limites e lacunas, brilho, transporte UDP,
+Os testes locais cobrem quadros RGBWW, limites e lacunas, brilho, transporte UDP,
 falhas, concorrência e comportamento do coordenador com substitutos mínimos do HA.
-Ainda falta validar o ciclo completo numa instância real do Home Assistant e
-conferir visualmente seus comandos completos de segmentos e brilho.
+O usuário confirmou a versão 0.2.1 no Home Assistant. Ainda falta validar as
+novas opções e animações da versão 0.3.0 nessa instalação.
 
 Veja [observações de hardware](HARDWARE.md), [contribuições](CONTRIBUTING.md) e
 [publicação de versões](docs/PUBLISHING.pt-BR.md). `tools/probe.py` consulta a fita

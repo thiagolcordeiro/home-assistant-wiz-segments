@@ -3,13 +3,15 @@
 import asyncio
 from datetime import timedelta
 import logging
+import time
 
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
-from .model import changed_states, compose_frame, restore_states
+from .model import changed_states, restore_states
+from .effects import EFFECTS, active_effects, render_frame
 from .protocol import WizError
 
 LOGGER = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class SegmentCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, entry, client, system):
         super().__init__(hass, LOGGER, name=DOMAIN, update_interval=timedelta(seconds=10))
         self.client = client
+        self.entry = entry
         self.system = system
         self.settings = {**entry.data, **entry.options}
         self.segments = self.settings["segments"]
@@ -28,6 +31,67 @@ class SegmentCoordinator(DataUpdateCoordinator):
         self.frame_known = False
         self.lock = asyncio.Lock()
         self.store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        self.effects = {segment["id"]: "off" for segment in self.segments}
+        self._effect_timer = None
+        self._effect_task = None
+        self._closed = False
+        self._effect_epoch = time.monotonic()
+
+    def stop_effects(self):
+        """Stop scheduling when another controller takes over or communication fails."""
+        self.effects = dict.fromkeys(self.effects, "off")
+        if self._effect_timer is not None:
+            self._effect_timer.cancel()
+            self._effect_timer = None
+
+    async def async_stop_effects(self):
+        self._closed = True
+        self.stop_effects()
+        if self._effect_task is not None:
+            self._effect_task.cancel()
+            try:
+                await self._effect_task
+            except asyncio.CancelledError:
+                pass
+            self._effect_task = None
+
+    def _schedule_effect(self):
+        if (self._closed or self._effect_timer is not None or not self.frame_known
+                or not active_effects(self.states, self.effects)):
+            return
+        delay = 1 / max(1, min(5, self.settings.get("effect_fps", 2)))
+        self._effect_timer = asyncio.get_running_loop().call_later(delay, self._start_effect_tick)
+
+    def _start_effect_tick(self):
+        self._effect_timer = None
+        if not self._closed:
+            self._effect_task = self.entry.async_create_background_task(
+                self.hass, self._async_effect_tick(), "WiZ segment effects", eager_start=False)
+
+    def _render(self, states, effects):
+        return render_frame(self.segments, states, self.settings["total_blocks"],
+                            self.settings["slot"], self.system["mac"], effects,
+                            time.monotonic() - self._effect_epoch,
+                            self.settings.get("effect_period", 6))
+
+    async def _async_effect_tick(self):
+        try:
+            async with self.lock:
+                if self._closed or not self.frame_known or not active_effects(self.states, self.effects):
+                    return
+                pilot = self.observe(await self.client.request("getPilot"))
+                if not self.frame_known:
+                    self.async_set_updated_data(pilot)
+                    return
+                await self.client.request("setPilot", self._render(self.states, self.effects))
+                # Frames are transient: no storage or HA state event per animation tick.
+        except WizError as err:
+            self.frame_known = False
+            self.stop_effects()
+            self.async_set_update_error(UpdateFailed(str(err)))
+        finally:
+            self._effect_task = None
+            self._schedule_effect()
 
     async def async_load(self):
         """Restore color preferences only; startup never changes the strip."""
@@ -40,6 +104,7 @@ class SegmentCoordinator(DataUpdateCoordinator):
             raise WizError("Missing power state")
         if not pilot["state"] or pilot.get("sceneId") != self.settings["slot"]:
             self.frame_known = False
+            self.stop_effects()
         return pilot
 
     async def _async_update_data(self):
@@ -48,11 +113,16 @@ class SegmentCoordinator(DataUpdateCoordinator):
                 return self.observe(await self.client.request("getPilot"))
             except WizError as err:
                 self.frame_known = False
+                self.stop_effects()
                 raise UpdateFailed(str(err)) from err
 
-    async def async_set_segment(self, segment_id, on, rgb=None, brightness=None, *, rgbww=None):
+    async def async_set_segment(self, segment_id, on, rgb=None, brightness=None, *, rgbww=None, effect=None):
         """Apply one edit to a serialized full-strip frame, then persist it."""
         async with self.lock:
+            if self._closed:
+                raise HomeAssistantError("Integration is unloading")
+            if effect is not None and effect not in EFFECTS:
+                raise HomeAssistantError("Unsupported segment effect")
             try:
                 pilot = self.observe(await self.client.request("getPilot"))
                 # Unknown external colors cannot be reconstructed. Start others
@@ -62,17 +132,26 @@ class SegmentCoordinator(DataUpdateCoordinator):
                 # An isolated OFF must not turn off an externally controlled strip.
                 if not on and pilot["state"] and not self.frame_known:
                     raise HomeAssistantError("Segment colors are unknown after external control. Turn a segment on to resume segment control.")
-                payload = compose_frame(self.segments, candidate, self.settings["total_blocks"],
-                                        self.settings["slot"], self.system["mac"])
+                candidate_effects = dict(self.effects)
+                if effect is not None:
+                    candidate_effects[segment_id] = effect
+                elif rgb is not None or rgbww is not None:
+                    candidate_effects[segment_id] = "off"
+                if not candidate[segment_id]["on"]:
+                    candidate_effects[segment_id] = "off"
+                payload = self._render(candidate, candidate_effects)
                 await self.client.request("setPilot", payload)
                 self.states = candidate
+                self.effects = candidate_effects
                 self.frame_known = payload["state"]
                 self.async_set_updated_data({"state": payload["state"],
                                              "sceneId": self.settings["slot"], "dimming": 100})
                 # Coalesce disk writes while sliders are dragged; HA flushes on shutdown.
                 self.store.async_delay_save(lambda: self.states, 1)
+                self._schedule_effect()
             except WizError as err:
                 self.frame_known = False
+                self.stop_effects()
                 self.async_set_update_error(UpdateFailed(str(err)))
                 raise HomeAssistantError(str(err)) from err
 # AI: end

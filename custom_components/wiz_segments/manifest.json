@@ -1,12 +1,14 @@
 {
   "domain": "wiz_segments",
   "name": "WiZ Segments",
-  "codeowners": ["@thiagolcordeiro"],
+  "codeowners": [
+    "@thiagolcordeiro"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/thiagolcordeiro/home-assistant-wiz-segments",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/thiagolcordeiro/home-assistant-wiz-segments/issues",
   "requirements": [],
-  "version": "0.2.1"
+  "version": "0.3.0"
 }

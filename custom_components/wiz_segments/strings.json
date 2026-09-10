@@ -28,22 +28,24 @@
     "step": {
       "init": {
         "title": "Configure your segments",
-        "description": "Changes are applied only after Save. Start/end use blocks of 6 LEDs, numbered from 1.",
+        "description": "Add, remove or resize segments. One block is 6 LEDs. Changes apply only after Save.",
         "menu_options": {
           "add": "Add segment",
           "edit": "Edit segment",
           "remove": "Remove segment",
           "device": "Strip connection and length",
-          "save": "Save changes"
+          "save": "Save changes",
+          "distribute": "Distribute segment count"
         }
       },
       "segment": {
         "title": "Segment boundaries",
-        "description": "Start and end are inclusive. Block 1 is LEDs 1–6; block 2 is LEDs 7–12. Shrink an existing segment before creating another in that space.",
+        "description": "Enter the segment length in blocks. Auto-arrange packs segments from block 1 without gaps, retaining their current order; new segments are appended. First block is ignored in this mode. Otherwise, First block sets the position. Shrink other segments if there is insufficient space.",
         "data": {
           "name": "Name",
           "start": "First block",
-          "end": "Last block"
+          "blocks": "Number of blocks",
+          "auto_arrange": "Auto-arrange segments"
         }
       },
       "edit": {
@@ -65,7 +67,16 @@
         "data": {
           "host": "Strip IP address",
           "total_blocks": "Number of physical blocks (6 LEDs each)",
-          "slot": "Custom mode number"
+          "slot": "Custom mode number",
+          "effect_period": "Effect cycle duration (seconds)",
+          "effect_fps": "Effect updates per second"
+        }
+      },
+      "distribute": {
+        "title": "Distribute the strip into segments",
+        "description": "Divide the whole strip evenly into the chosen count. Replaces existing sizes and gaps. Keeps names and IDs of the first segments; reducing the count removes the last ones. Review before Save.",
+        "data": {
+          "count": "Number of segments"
         }
       }
     },
