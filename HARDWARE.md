@@ -1,81 +1,87 @@
-# WiZ segment integration: hardware validation
+# Hardware validation / Validação de hardware
 
-Target: WiZ RGBIC 5 m, product 605568.
-Read-only UDP queries on 2026-09-10 returned:
+## Validated platform / Plataforma validada
 
-- Module: ESP25_MHORGB_01
-- Firmware: 1.38.0
-- Initial power state: off
+- WiZ RGBIC 5 m, product / produto **605568**.
+- Module / módulo: `ESP25_MHORGB_01`.
+- Firmware: `1.38.0`.
+- Addressable block / bloco endereçável: **6 LEDs**.
+- Validated custom mode / modo personalizado validado: **258**.
 
-This matches the device/firmware used in the independent protocol investigation:
-https://github.com/TechAntohere/WizScreenSyncController/
+Independent RGB regions and both white controls have been visually validated.
+Warm white and cool white are correctly mapped in Home Assistant's RGBWW order.
+Version 0.2.1 was validated in Home Assistant; the new 0.3.0 animations still
+require visual validation on hardware.
 
-The official product sheet lists RGB, not five independently driven channels:
-https://www.assets.signify.com/is/content/Signify/US.en_US.046677605568
+As regiões RGB independentes e os dois controles de branco foram validados
+visualmente. Branco quente e branco frio estão corretamente mapeados na ordem
+RGBWW do Home Assistant. A versão 0.2.1 foi validada no Home Assistant; as novas
+animações da 0.3.0 ainda precisam de validação visual no hardware.
 
-Do not infer dedicated white LEDs from white presets or c/w fields in getPilot.
-Per-region warm and cool controls have since been demonstrated by the visual
-test below. This confirms functional controls but not dedicated white emitters.
+## Confirmed channel mapping / Mapeamento confirmado
 
-The protocol investigation reports at most 12 color runs, physical block widths,
-and no segment frame readback. A saved custom scene can override supplied data
-while still returning success. Visual validation is required. Region state in a
-future integration must distinguish desired state from observed device state.
+| Output / Saída | Home Assistant `rgbww_color` | Wire field / Campo no protocolo |
+|---|---|---|
+| Red / Vermelho | `[255, 0, 0, 0, 0]` | Step index / índice 1 |
+| Green / Verde | `[0, 255, 0, 0, 0]` | Step index / índice 2 |
+| Blue / Azul | `[0, 0, 255, 0, 0]` | Step index / índice 3 |
+| Warm white / Branco quente | `[0, 0, 0, 0, 255]` | Step index / índice 4 |
+| Cool white / Branco frio | `[0, 0, 0, 255, 0]` | Step index / índice 5 |
+| RGB white / Branco RGB | `[255, 255, 255, 0, 0]` | RGB combined / RGB combinados |
 
-## Reusable probe
+White controls were tested separately with RGB zeroed. An RGB-white reference
+produced a visibly different white from the cool-white control. Home Assistant
+orders the channels as R,G,B,cold,warm; the wire uses R,G,B,warm,cold. The encoder
+converts that order. These results confirm functional white controls; emitter
+composition, Kelvin calibration and mixed-white brightness curves are unmeasured.
 
-Read-only, using Python 3 with no third-party dependencies:
+Os controles de branco foram testados separadamente, com RGB zerado. A referência
+de branco RGB apresentou diferença visual em relação ao controle de branco frio.
+O Home Assistant usa R,G,B,frio,quente; o protocolo usa R,G,B,quente,frio.
+O codificador converte essa ordem. Os resultados confirmam controles funcionais;
+a composição dos emissores, a calibração em Kelvin e as curvas de brilho das
+misturas de branco não foram medidas.
+
+## Protocol behavior / Comportamento do protocolo
+
+The integration enforces a 12-region command limit, including dark gaps and the
+unused tail. The device does not return segment colors, so entity state is assumed.
+A saved WiZ custom mode may override supplied colors even when a command is
+acknowledged. Keep the configured slot free of saved modes. The all-off command
+uses only `setPilot` with `state: false`; combined restoration fields containing
+sceneId 0 can be rejected by this firmware.
+
+A integração limita os comandos a 12 regiões, incluindo lacunas apagadas e o
+final sem uso. O dispositivo não devolve as cores dos segmentos; o estado das
+entidades é presumido. Um modo personalizado salvo no WiZ pode substituir as cores
+enviadas mesmo com confirmação do comando. Mantenha o modo configurado livre.
+O comando para desligar tudo usa apenas `setPilot` com `state: false`; campos
+combinados de restauração contendo sceneId 0 podem ser recusados pelo firmware.
+
+## Diagnostic utility / Utilitário de diagnóstico
+
+Read-only identification / Identificação sem alterar a iluminação:
 
 ```text
 python tools/probe.py STRIP_IP
 ```
 
-With the strip initially off and a person watching it, test three low-brightness
-RGB regions for 20 seconds, then restore and verify the off state:
+Optional RGB test, starting with the strip off: three regions, each three blocks
+wide, for 20 seconds. The utility restores and checks the off state afterward.
+This utility tests RGB; the separate white-control validation is recorded above.
+
+Teste RGB opcional, com a fita inicialmente apagada: três regiões de três blocos
+por 20 segundos. O utilitário restaura e verifica o estado desligado ao final.
+Esse utilitário testa RGB; a validação separada dos brancos está registrada acima.
 
 ```text
 python tools/probe.py STRIP_IP --test --slot 258 --width 3 --seconds 20
 ```
 
-Width is in hardware blocks, not individual LEDs. Slot 258 worked on the tested strip but may be occupied on other devices. Do not automatically scan slots
-or claim that an acknowledgment demonstrates independent segment control.
+Replace `STRIP_IP` with the device address. Width is in blocks, not individual LEDs.
+Substitua `STRIP_IP` pelo endereço do dispositivo. A largura é em blocos, não LEDs individuais.
 
-## Confirmed visual test
+## References / Referências
 
-The user observed three contiguous regions in red, green and blue, with 18 LEDs
-per region and the rest dark. Each wire step had width 3, establishing 6 LEDs
-per hardware block. Custom slot 258 accepted the test visually, not just by ACK.
-The user reports removing 42 LEDs from the end. With the original 150 LEDs,
-the installed strip has 108 LEDs / 18 physical blocks.
-
-After the observation, restoring the combined original color fields was rejected
-with Invalid params. A standalone `setPilot` with `state: false` succeeded and
-`getPilot` verified power off. The original saved color/scene was not restored.
-The reusable probe now omits sceneId 0 from restoration and has a separate OFF
-fallback. The integration's all-off command contains only `state: false`.
-
-## Confirmed white-control test
-
-Four width-3 regions (18 LEDs each) were sent with global brightness 30 and
-per-step dimming 100, on slot 258:
-
-| Physical LEDs | Fields sent | Observed output |
-|---|---|---|
-| 1–18 | R=255, other channels zero | Red |
-| 19–36 | Step index 4=255, RGB and index 5 zero | Warm white |
-| 37–54 | Step index 5=255, RGB and index 4 zero | Cool white |
-| 55–72 | R=G=B=255, indices 4 and 5 zero | Similar cool white, subtly different |
-
-The user first described red, warm white and cool white, then confirmed that the
-last area was twice as long with a subtle change halfway. This distinguishes the
-two final regions. The rest was not commanded. There was no automatic shutoff;
-after feedback, a standalone OFF command succeeded and getPilot verified off.
-
-Mapping for this hardware/firmware: wire index 4 is warm, index 5 is cool.
-Home Assistant RGBWW ordering is R,G,B,cold,warm, so the encoder must swap whites.
-White-only frames must not be treated as off merely because RGB is zero.
-Optical emitter composition, Kelvin calibration, mixed-white behavior and
-independent brightness curves remain unmeasured.
-
-An experimental RGBWW Home Assistant integration is now in `custom_components/wiz_segments`.
-It has not yet been installed or validated inside Home Assistant.
+- [Independent protocol investigation / Investigação independente do protocolo](https://github.com/TechAntohere/WizScreenSyncController/)
+- [Official product sheet / Ficha oficial do produto](https://www.assets.signify.com/is/content/Signify/US.en_US.046677605568)

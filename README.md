@@ -11,18 +11,14 @@ See [HARDWARE.md](HARDWARE.md) for actual hardware observations.
 
 ## Supported hardware and controls
 
-- WiZ 605568, module `ESP25_MHORGB_01`, firmware `1.38.0` was identified locally.
-- A user visually confirmed three separate red/green/blue regions, each 18 LEDs
-  long, with a width setting of 3. Therefore one physical block is 6 LEDs.
-- The reported cut removed 42 LEDs from the original 150: that test installation
-  has **108 LEDs / 18 blocks**. Adjust this if the original count differs.
-- RGB, warm-white control, cool-white control, brightness and on/off are available
-  per entity. A second visual test confirmed separate warm and cool outputs with
-  RGB zeroed, alongside an RGB-white reference. This demonstrates functional
-  controls, not whether the strip has physically separate white emitters.
-- The implementation enforces the reported limit of 12 wire regions. Dark gaps
-  and an unused tail consume regions too. This limit has not been retested on
-  the user's strip.
+- Validated hardware: WiZ 605568, module `ESP25_MHORGB_01`, firmware `1.38.0`.
+- Independent red, green and blue regions were visually validated.
+  Each addressable physical block contains **6 LEDs**.
+- RGB, warm white, cool white, brightness and on/off are available per entity.
+  **Warm-white and cool-white controls are correctly mapped and visually confirmed**,
+  tested separately with RGB zeroed and an RGB-white reference for comparison.
+- The implementation enforces a limit of 12 wire regions, including dark gaps
+  and the unused tail.
 - The firmware does not return segment colors. Entities use assumed state.
 
 ## Requirements and HACS installation
@@ -54,10 +50,9 @@ to `/config/custom_components/wiz_segments`. The final manifest path must be
 and add the integration as described above.
 
 Enter your strip's IP, installed physical block count and custom mode (default 258).
-There are six LEDs per block on the tested hardware: 150 LEDs = 25 blocks;
-a strip cut to 108 LEDs = 18 blocks. The integration cannot detect cut length.
-Up to three initial entities cover the strip. With 18 blocks these are 1–6,
-7–12 and 13–18, or 36 LEDs each. Setup does not change lighting.
+There are six LEDs per block on the validated hardware: 150 LEDs = 25 blocks.
+Enter the actual installed block count; length is not detected automatically.
+Up to three initial entities cover the strip. Setup does not change lighting.
 English and Portuguese interface translations are included. Rename the device
 and entities through the usual Home Assistant interface.
 
@@ -74,7 +69,7 @@ Ranges are inclusive, numbered from 1, in blocks of six physical LEDs:
 | 1–3 | 1–18 |
 | 4–6 | 19–36 |
 | 7–9 | 37–54 |
-| 10–18 | 55–108 |
+| 10–12 | 55–72 |
 
 Shrink or remove an existing region before adding another in its space.
 Overlapping regions and layouts requiring more than 12 wire steps are rejected.
@@ -117,7 +112,8 @@ target:
 ```
 
 The wire uses warm then cool, so the integration deliberately swaps the last two
-values. This mapping was visually validated on the user's firmware 1.38.0.
+values. Both white controls were visually validated on firmware 1.38.0:
+`[0, 0, 0, 0, 255]` produces warm white and `[0, 0, 0, 255, 0]` produces cool white.
 Simultaneous white-channel mixing and optical brightness curves have not been
 measured; no calibrated Kelvin range is advertised. Saved 0.1.0 RGB preferences
 are loaded with both white channels set to zero.
@@ -160,7 +156,7 @@ switch the strip off; turn it off first if that is your desired final state.
 | Cannot connect | Verify power, IP, Wi-Fi isolation/VLAN routing and UDP 38899 from HA. |
 | Unsupported module | Report model/module/firmware; do not bypass the module check. |
 | ACK but unchanged colors | Check whether a saved WiZ scene occupies the custom slot. |
-| Wrong region lengths | Count installed six-LED blocks, accounting for cuts. |
+| Wrong region lengths | Check the installed count of six-LED blocks. |
 | Rejected layout | Check bounds, overlaps and the 12-region limit including gaps/tail. |
 | Unknown state | Turn a segment on to resume control as described above. |
 | No white controls in card | Send `rgbww_color` through an action with RGB zeroed. |
@@ -228,8 +224,7 @@ individual control within a six-LED block and no WLED frame-rate guarantee.
 The HA server must remain running. Effects stop after a detected external scene,
 power-off, communication failure, reload or HA shutdown and do not resume by
 themselves. Stopping HA can leave the last transmitted colors lit. External writes
-to the same slot cannot reliably be detected. The 0.2.1 integration was confirmed
-working by its user; these new animations still need visual validation on hardware.
+to the same slot cannot reliably be detected. Version 0.2.1 was validated in Home Assistant; these new animations still need visual validation on hardware.
 
 ## Validation and remaining work
 
@@ -239,16 +234,10 @@ coordinator tests check serialized concurrent writes, failed-write rollback,
 preserving other regions and no startup replay. These use minimal substitutes
 for HA infrastructure and do not constitute full Home Assistant lifecycle tests.
 
-The asynchronous client successfully queried the real strip. The earlier
-three-color payload and the separate warm/cool/RGB-white payload were visually
-verified by the user. The production full-frame
-payload (including dark gaps and independent brightness) still requires visual
-verification from within Home Assistant. The strip was verified off afterward.
-
-All Python files are syntax-checked with Python 3.11. The integration uses modern
-HA config entries and coordinator APIs, and the user confirmed version 0.2.1 working in Home Assistant. The new 0.3.0
-features still require runtime and visual validation. Confirm the installed HA version before deploying in a
-production setup. The user installed and validated version 0.2.1.
+Local communication, independent RGB regions and correctly mapped warm/cool
+white controls have been validated on the supported hardware. Version 0.2.1
+was also validated in Home Assistant. The new layout options and animations in
+0.3.0 still require runtime and visual validation.
 
 Run offline tests using Python 3.11+:
 

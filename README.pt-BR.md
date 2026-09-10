@@ -6,10 +6,11 @@ Integração personalizada para controlar uma fita WiZ RGBIC diretamente pelo IP
 sem ESP e sem WLED. Cada segmento configurado vira uma entidade de luz no Home
 Assistant, com liga/desliga, brilho, vermelho, verde, azul, branco frio e branco quente.
 
-**Versão experimental 0.3.0.** RGB e os dois controles de branco foram confirmados
-visualmente em uma WiZ 605568, módulo `ESP25_MHORGB_01`, firmware `1.38.0`.
-Os testes automatizados não substituem a validação dentro do Home Assistant,
-da nova versão. O usuário confirmou a versão 0.2.1 funcionando no Home Assistant. Outros módulos são recusados durante a configuração.
+**Versão experimental 0.3.0.** O controle independente de RGB e o mapeamento correto
+de **branco quente e branco frio estão confirmados visualmente** na WiZ 605568,
+módulo `ESP25_MHORGB_01`, firmware `1.38.0`. A versão 0.2.1 foi validada no Home
+Assistant; as novas opções e animações da 0.3.0 ainda precisam de validação em uso.
+Outros módulos são recusados durante a configuração.
 Este projeto é independente e não é uma integração oficial da WiZ.
 
 ## Requisitos
@@ -48,14 +49,13 @@ Reinicie o Home Assistant e adicione a integração como descrito acima.
 
 Informe o IP da sua fita, a quantidade de blocos físicos instalados e o modo
 personalizado. No hardware testado, cada bloco tem **6 LEDs**. Uma fita completa
-com 150 LEDs possui 25 blocos; uma fita cortada para 108 LEDs possui 18 blocos.
-Conte os LEDs efetivamente instalados. A configuração não identifica o corte automaticamente.
+com 150 LEDs possui 25 blocos. Informe a quantidade efetivamente instalada;
+o comprimento não é identificado automaticamente.
 
 O modo padrão é **258**, validado no teste. Ele deve estar livre de modos
 personalizados salvos pelo aplicativo WiZ; um modo ocupado pode aceitar o comando
 e ignorar suas cores. A configuração cria até três segmentos cobrindo toda a fita
-e não altera sua iluminação. Para 18 blocos, os intervalos iniciais são 1–6,
-7–12 e 13–18, com 36 LEDs cada.
+e não altera sua iluminação.
 
 ## Criar e editar segmentos
 
@@ -70,7 +70,7 @@ Os limites são inclusivos e começam em 1:
 | 1–3 | 1–18 |
 | 4–6 | 19–36 |
 | 7–9 | 37–54 |
-| 10–18 | 55–108 |
+| 10–12 | 55–72 |
 
 Reduza ou remova um segmento existente antes de criar outro no mesmo espaço.
 Não são permitidas sobreposições, intervalos fora da fita ou remoção de todos
@@ -118,8 +118,10 @@ target:
 
 Cada comando recompõe a fita inteira, preservando os outros segmentos sob controle
 da integração. Lacunas ficam apagadas. Os campos de branco do protocolo têm ordem
-inversa à do Home Assistant; a integração faz a conversão. Os testes demonstram
-controles funcionais de branco, não a existência de emissores brancos separados.
+inversa à do Home Assistant; a integração faz a conversão. O mapeamento foi
+validado visualmente: `[0, 0, 0, 0, 255]` produz branco quente e
+`[0, 0, 0, 255, 0]` produz branco frio. A validação confirma os controles
+funcionais, sem determinar a composição física dos emissores.
 Temperatura em Kelvin, misturas simultâneas dos brancos e curvas ópticas não foram
 calibradas. Preferências RGB da versão 0.1.0 são carregadas com os brancos zerados.
 
@@ -160,7 +162,7 @@ integração não envia um comando para desligar a fita; desligue antes se desej
 | Não conecta | Confira IP, energia, isolamento Wi-Fi/VLAN e UDP 38899 a partir do servidor HA. |
 | Módulo incompatível | Envie modelo, módulo e firmware em uma issue; não force outro módulo. |
 | Comando aceito sem mudar cores | Confira se o modo 258 está ocupado por uma cena salva. |
-| Trechos têm comprimento errado | Use blocos de 6 LEDs e a quantidade restante depois do corte. |
+| Trechos têm comprimento errado | Confira a quantidade instalada de blocos de 6 LEDs. |
 | Layout rejeitado | Revise sobreposições e conte também lacunas e cauda no limite de 12. |
 | Estado desconhecido | Ligue um segmento para retomar o controle conforme explicado acima. |
 | Branco não aparece no cartão | Teste `rgbww_color` pela ação, com RGB zerado. |
@@ -232,7 +234,7 @@ O servidor HA precisa continuar funcionando. Efeitos param após detectar cena
 externa, desligamento, falha de comunicação, recarga ou encerramento do HA, sem
 retomada automática. Ao parar o HA, as últimas cores enviadas podem continuar
 acesas. Alterações externas no mesmo modo não são detectadas com segurança.
-A versão 0.2.1 foi confirmada funcionando pelo usuário; as novas animações ainda
+A versão 0.2.1 foi validada no Home Assistant; as novas animações ainda
 precisam de validação visual na fita.
 
 ## Desenvolvimento e licença
@@ -244,8 +246,10 @@ python tools/validate_release.py
 
 Os testes locais cobrem quadros RGBWW, limites e lacunas, brilho, transporte UDP,
 falhas, concorrência e comportamento do coordenador com substitutos mínimos do HA.
-O usuário confirmou a versão 0.2.1 no Home Assistant. Ainda falta validar as
-novas opções e animações da versão 0.3.0 nessa instalação.
+A comunicação local, as regiões RGB independentes e o mapeamento correto dos
+brancos quente e frio foram validados no hardware compatível. A versão 0.2.1
+também foi validada no Home Assistant. As novas opções e animações da versão
+0.3.0 ainda precisam de validação em uso.
 
 Veja [observações de hardware](HARDWARE.md), [contribuições](CONTRIBUTING.md) e
 [publicação de versões](docs/PUBLISHING.pt-BR.md). `tools/probe.py` consulta a fita

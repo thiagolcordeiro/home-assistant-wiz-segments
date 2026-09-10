@@ -8,7 +8,7 @@
 - Edição por quantidade de blocos, organização automática opcional e distribuição dinâmica.
 - Efeitos com frequência limitada e divisão do espaço disponível no comando.
 - Interrupção em controle externo, falhas e recarga; compatibilidade com IDs e configurações existentes.
-- User confirmed 0.2.1 running in HA; new 0.3.0 behavior awaits hardware validation.
+- Version 0.2.1 validated in HA; new 0.3.0 behavior awaits hardware validation.
 
 ## 0.2.1 — 2026-09-10 (experimental)
 
