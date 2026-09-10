@@ -1,0 +1,81 @@
+{
+  "title": "WiZ Segments",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect your WiZ RGBIC strip",
+        "description": "Connect directly to the strip without an ESP. Enter the installed block count: each block has 6 LEDs on supported hardware. Up to three initial segments will be created. Custom mode 258 must remain unused by saved WiZ app modes. Setup does not change lighting.",
+        "data": {
+          "host": "Strip IP address",
+          "total_blocks": "Number of physical blocks (6 LEDs each)",
+          "slot": "Custom mode number"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the strip. Check its IP address and local UDP access.",
+      "invalid_host": "Enter a valid IPv4 address.",
+      "unsupported_device": "This version supports the ESP25_MHORGB_01 module only.",
+      "wrong_device": "This IP belongs to a different strip.",
+      "invalid_layout": "Use non-overlapping ranges inside the strip, with at least one segment. Edit an existing range before adding a segment in its place.",
+      "too_many_steps": "This layout exceeds 12 regions when dark gaps and the unused tail are included."
+    },
+    "abort": {
+      "already_configured": "This strip is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure your segments",
+        "description": "Changes are applied only after Save. Start/end use blocks of 6 LEDs, numbered from 1.",
+        "menu_options": {
+          "add": "Add segment",
+          "edit": "Edit segment",
+          "remove": "Remove segment",
+          "device": "Strip connection and length",
+          "save": "Save changes"
+        }
+      },
+      "segment": {
+        "title": "Segment boundaries",
+        "description": "Start and end are inclusive. Block 1 is LEDs 1–6; block 2 is LEDs 7–12. Shrink an existing segment before creating another in that space.",
+        "data": {
+          "name": "Name",
+          "start": "First block",
+          "end": "Last block"
+        }
+      },
+      "edit": {
+        "title": "Choose a segment to edit",
+        "data": {
+          "segment": "Segment"
+        }
+      },
+      "remove": {
+        "title": "Choose a segment to remove",
+        "description": "Removal is staged until Save. Lighting changes on your next light command.",
+        "data": {
+          "segment": "Segment"
+        }
+      },
+      "device": {
+        "title": "Strip settings",
+        "description": "If the strip was shortened, resize or remove ranges outside its new length before reducing the block count.",
+        "data": {
+          "host": "Strip IP address",
+          "total_blocks": "Number of physical blocks (6 LEDs each)",
+          "slot": "Custom mode number"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the strip. Check its IP address and local UDP access.",
+      "invalid_host": "Enter a valid IPv4 address.",
+      "unsupported_device": "This version supports the ESP25_MHORGB_01 module only.",
+      "wrong_device": "This IP belongs to a different strip.",
+      "invalid_layout": "Use non-overlapping ranges inside the strip, with at least one segment. Edit an existing range before adding a segment in its place.",
+      "too_many_steps": "This layout exceeds 12 regions when dark gaps and the unused tail are included."
+    }
+  }
+}

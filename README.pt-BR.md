@@ -1,0 +1,190 @@
+# WiZ Segments
+
+[English](README.md) | **Português brasileiro**
+
+Integração personalizada para controlar uma fita WiZ RGBIC diretamente pelo IP,
+sem ESP e sem WLED. Cada segmento configurado vira uma entidade de luz no Home
+Assistant, com liga/desliga, brilho, vermelho, verde, azul, branco frio e branco quente.
+
+**Versão experimental 0.2.1.** RGB e os dois controles de branco foram confirmados
+visualmente em uma WiZ 605568, módulo `ESP25_MHORGB_01`, firmware `1.38.0`.
+Os testes automatizados não substituem a validação dentro do Home Assistant,
+que ainda está pendente. Outros módulos são recusados durante a configuração.
+Este projeto é independente e não é uma integração oficial da WiZ.
+
+## Requisitos
+
+- Home Assistant 2026.3 ou posterior: versão mínima declarada para os ícones locais;
+  ainda não representa uma matriz de versões testadas em execução.
+- Fita compatível configurada no aplicativo WiZ e acessível pela rede local.
+- Comunicação UDP na porta 38899 entre o Home Assistant e a fita. Reserve o IP
+  no DHCP do roteador; não é necessário expor portas para a internet.
+- HACS instalado, caso escolha essa forma de instalação. Siga o
+  [guia oficial do HACS](https://www.hacs.xyz/docs/use/) para instalar e configurar
+  o próprio HACS conforme seu tipo de instalação do Home Assistant.
+
+## Instalação pelo HACS
+
+1. Abra **HACS → menu ⋮ → Repositórios personalizados**.
+2. Informe `https://github.com/thiagolcordeiro/home-assistant-wiz-segments`,
+   selecione o tipo **Integração** e adicione.
+3. Procure **WiZ Segments**, abra o projeto e escolha **Baixar**.
+4. Reinicie o Home Assistant.
+5. Vá a **Configurações → Dispositivos e serviços → Adicionar integração** e
+   procure **WiZ Segments**.
+
+A inclusão é por repositório personalizado; não significa aprovação no catálogo
+padrão do HACS. [Instruções oficiais](https://www.hacs.xyz/docs/faq/custom_repositories/).
+
+## Instalação manual
+
+Baixe o código do repositório ou de uma release e copie somente a pasta
+`custom_components/wiz_segments` para `/config/custom_components/wiz_segments`.
+O arquivo final precisa estar em
+`/config/custom_components/wiz_segments/manifest.json`.
+Reinicie o Home Assistant e adicione a integração como descrito acima.
+
+## Configuração inicial
+
+Informe o IP da sua fita, a quantidade de blocos físicos instalados e o modo
+personalizado. No hardware testado, cada bloco tem **6 LEDs**. Uma fita completa
+com 150 LEDs possui 25 blocos; uma fita cortada para 108 LEDs possui 18 blocos.
+Conte os LEDs efetivamente instalados. A configuração não identifica o corte automaticamente.
+
+O modo padrão é **258**, validado no teste. Ele deve estar livre de modos
+personalizados salvos pelo aplicativo WiZ; um modo ocupado pode aceitar o comando
+e ignorar suas cores. A configuração cria até três segmentos cobrindo toda a fita
+e não altera sua iluminação. Para 18 blocos, os intervalos iniciais são 1–6,
+7–12 e 13–18, com 36 LEDs cada.
+
+## Criar e editar segmentos
+
+Abra **Configurar** na integração e escolha adicionar, editar ou remover segmento.
+Confirme em **Salvar alterações**. As edições ficam pendentes até salvar;
+a iluminação muda no próximo comando de luz.
+
+Os limites são inclusivos e começam em 1:
+
+| Blocos | LEDs físicos |
+|---|---|
+| 1–3 | 1–18 |
+| 4–6 | 19–36 |
+| 7–9 | 37–54 |
+| 10–18 | 55–108 |
+
+Reduza ou remova um segmento existente antes de criar outro no mesmo espaço.
+Não são permitidas sobreposições, intervalos fora da fita ou remoção de todos
+os segmentos. O limite implementado é **12 regiões no comando**, incluindo
+lacunas apagadas e o final sem uso. Portanto, nem todo desenho permite 12 entidades.
+Renomear ou redimensionar mantém a identidade da entidade; remover exclui sua
+entidade do registro depois de salvar. Ajuste automações que usem entidades removidas.
+
+O controle mínimo é um bloco de seis LEDs, sem endereçamento individual dentro
+do bloco. Esta versão não oferece animações, gradientes em movimento ou transições.
+
+## Cores, brancos e brilho
+
+As entidades usam `RGBWW`. O cartão padrão depende da versão da interface do
+Home Assistant e não inclui necessariamente cinco controles separados.
+Para valores exatos, use **Ferramentas do desenvolvedor → Ações** ou automações.
+Substitua `light.wiz_rgbic_segment_1` pelo ID real da sua entidade.
+
+```yaml
+action: light.turn_on
+target:
+  entity_id: light.wiz_rgbic_segment_1
+data:
+  brightness: 128
+  rgbww_color: [0, 0, 0, 0, 255]
+```
+
+A ordem é **[vermelho, verde, azul, branco frio, branco quente]**.
+Cada canal aceita 0–255; `brightness` é um ajuste independente de 0–255.
+
+| Resultado | `rgbww_color` |
+|---|---|
+| Vermelho | `[255, 0, 0, 0, 0]` |
+| Verde | `[0, 255, 0, 0, 0]` |
+| Azul | `[0, 0, 255, 0, 0]` |
+| Branco quente | `[0, 0, 0, 0, 255]` |
+| Branco frio | `[0, 0, 0, 255, 0]` |
+| Branco formado por RGB | `[255, 255, 255, 0, 0]` |
+
+```yaml
+action: light.turn_off
+target:
+  entity_id: light.wiz_rgbic_segment_1
+```
+
+Cada comando recompõe a fita inteira, preservando os outros segmentos sob controle
+da integração. Lacunas ficam apagadas. Os campos de branco do protocolo têm ordem
+inversa à do Home Assistant; a integração faz a conversão. Os testes demonstram
+controles funcionais de branco, não a existência de emissores brancos separados.
+Temperatura em Kelvin, misturas simultâneas dos brancos e curvas ópticas não foram
+calibradas. Preferências RGB da versão 0.1.0 são carregadas com os brancos zerados.
+
+## Aplicativo WiZ, estado e reinicialização
+
+O dispositivo não devolve as cores por segmento. As entidades apresentam estado
+presumido; uma confirmação UDP não prova a saída visual. Há consulta de estado
+geral a cada 10 segundos. Cores e brilho preferidos são armazenados localmente,
+mas iniciar ou reconfigurar a integração não liga a fita automaticamente.
+
+Após reinício, falha de comunicação, mudança de layout ou cena externa, o estado
+individual pode ficar desconhecido enquanto a fita estiver ligada. Ligue um
+segmento para retomar o controle: os demais segmentos desconhecidos ficam apagados.
+Desligar isoladamente um segmento nessa situação é recusado porque não é possível
+preservar uma cena que não pode ser lida. Quando a fita informa que está desligada,
+todas as entidades indicam desligado.
+
+Evite comandos simultâneos do aplicativo WiZ, WLED e outras integrações para a
+mesma fita. Alterações externas no mesmo modo personalizado não são detectáveis
+com segurança. Atualizações de firmware podem mudar o comportamento.
+
+## Atualizar, reverter e remover
+
+Faça backup do Home Assistant antes de atualizar. Pelo HACS, abra WiZ Segments,
+baixe a versão desejada e reinicie. Para reverter, use a opção de baixar novamente
+selecionando uma release anterior disponível, ou restaure o backup. Na instalação
+manual, substitua a pasta da integração pelos arquivos da versão desejada e reinicie.
+
+Para remover, exclua a entrada em Dispositivos e serviços e depois remova o download
+no HACS (ou a pasta instalada manualmente), reiniciando em seguida. A remoção da
+integração não envia um comando para desligar a fita; desligue antes se desejar.
+
+## Solução de problemas
+
+| Sintoma | Verificação |
+|---|---|
+| Integração não aparece | Confira o caminho de `manifest.json`, reinicie e recarregue a página. |
+| Não conecta | Confira IP, energia, isolamento Wi-Fi/VLAN e UDP 38899 a partir do servidor HA. |
+| Módulo incompatível | Envie modelo, módulo e firmware em uma issue; não force outro módulo. |
+| Comando aceito sem mudar cores | Confira se o modo 258 está ocupado por uma cena salva. |
+| Trechos têm comprimento errado | Use blocos de 6 LEDs e a quantidade restante depois do corte. |
+| Layout rejeitado | Revise sobreposições e conte também lacunas e cauda no limite de 12. |
+| Estado desconhecido | Ligue um segmento para retomar o controle conforme explicado acima. |
+| Branco não aparece no cartão | Teste `rgbww_color` pela ação, com RGB zerado. |
+
+Consulte **Configurações → Sistema → Registros** e procure `wiz_segments`.
+Ao relatar problemas, inclua versões do HA e da integração, modelo/firmware,
+limites dos segmentos e resultado esperado/observado. Remova IPs, MACs, e-mails e
+tokens dos registros antes de publicar.
+
+## Desenvolvimento e licença
+
+```text
+python -m unittest discover -s tests -v
+python tools/validate_release.py
+```
+
+Os 26 testes locais cobrem quadros RGBWW, limites e lacunas, brilho, transporte UDP,
+falhas, concorrência e comportamento do coordenador com substitutos mínimos do HA.
+Ainda falta validar o ciclo completo numa instância real do Home Assistant e
+conferir visualmente seus comandos completos de segmentos e brilho.
+
+Veja [observações de hardware](HARDWARE.md), [contribuições](CONTRIBUTING.md) e
+[publicação de versões](docs/PUBLISHING.pt-BR.md). `tools/probe.py` consulta a fita
+sem alterar a iluminação por padrão; o teste visual opcional usa temporizador.
+
+Licença [MIT](LICENSE). Implementação e testes desenvolvidos com assistência de IA,
+sem copiar código do [projeto de investigação do protocolo](https://github.com/TechAntohere/WizScreenSyncController/).

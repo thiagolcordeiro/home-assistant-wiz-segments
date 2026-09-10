@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.zip
+test-state.json
+white-test-state.json
+dist/
+.venv/
+.env
+.env.*
+*.log
+.DS_Store

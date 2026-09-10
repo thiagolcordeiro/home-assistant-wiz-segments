@@ -1,0 +1,81 @@
+{
+  "title": "WiZ Segments",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar fita WiZ RGBIC",
+        "description": "Conecte diretamente à fita, sem ESP. Informe a quantidade de blocos instalada: cada bloco tem 6 LEDs no hardware compatível. Serão criados até três segmentos iniciais. O modo 258 deve estar livre de modos salvos pelo aplicativo WiZ. A configuração não altera a iluminação.",
+        "data": {
+          "host": "Endereço IP da fita",
+          "total_blocks": "Quantidade de blocos físicos (6 LEDs cada)",
+          "slot": "Número do modo personalizado"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Não foi possível acessar a fita. Verifique o IP e o acesso UDP na rede local.",
+      "invalid_host": "Informe um endereço IPv4 válido.",
+      "unsupported_device": "Esta versão aceita somente o módulo ESP25_MHORGB_01.",
+      "wrong_device": "Este IP pertence a outra fita.",
+      "invalid_layout": "Use intervalos sem sobreposição e dentro da fita, mantendo pelo menos um segmento. Reduza um segmento existente antes de adicionar outro no mesmo espaço.",
+      "too_many_steps": "O limite é 12 regiões, contando os espaços apagados e o final não utilizado."
+    },
+    "abort": {
+      "already_configured": "Esta fita já está configurada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configurar segmentos",
+        "description": "As alterações são aplicadas somente após Salvar. Os limites usam blocos de 6 LEDs, numerados a partir de 1.",
+        "menu_options": {
+          "add": "Adicionar segmento",
+          "edit": "Editar segmento",
+          "remove": "Remover segmento",
+          "device": "Conexão e tamanho da fita",
+          "save": "Salvar alterações"
+        }
+      },
+      "segment": {
+        "title": "Limites do segmento",
+        "description": "O bloco inicial e o final estão incluídos. Bloco 1: LEDs 1–6; bloco 2: LEDs 7–12. Reduza um segmento existente antes de criar outro nesse espaço.",
+        "data": {
+          "name": "Nome",
+          "start": "Primeiro bloco",
+          "end": "Último bloco"
+        }
+      },
+      "edit": {
+        "title": "Escolher segmento para editar",
+        "data": {
+          "segment": "Segmento"
+        }
+      },
+      "remove": {
+        "title": "Escolher segmento para remover",
+        "description": "A remoção será aplicada após Salvar. A iluminação muda no próximo comando de uma lâmpada.",
+        "data": {
+          "segment": "Segmento"
+        }
+      },
+      "device": {
+        "title": "Configurações da fita",
+        "description": "Se cortou a fita, ajuste primeiro os segmentos que ultrapassam o novo comprimento e depois reduza a quantidade de blocos.",
+        "data": {
+          "host": "Endereço IP da fita",
+          "total_blocks": "Quantidade de blocos físicos (6 LEDs cada)",
+          "slot": "Número do modo personalizado"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Não foi possível acessar a fita. Verifique o IP e o acesso UDP na rede local.",
+      "invalid_host": "Informe um endereço IPv4 válido.",
+      "unsupported_device": "Esta versão aceita somente o módulo ESP25_MHORGB_01.",
+      "wrong_device": "Este IP pertence a outra fita.",
+      "invalid_layout": "Use intervalos sem sobreposição e dentro da fita, mantendo pelo menos um segmento. Reduza um segmento existente antes de adicionar outro no mesmo espaço.",
+      "too_many_steps": "O limite é 12 regiões, contando os espaços apagados e o final não utilizado."
+    }
+  }
+}

@@ -1,0 +1,36 @@
+name: Bug report / Relatar problema
+description: Report a reproducible issue / Relate um problema reproduzível
+body:
+  - type: markdown
+    attributes:
+      value: "English or português brasileiro are welcome. Do not include tokens, passwords, IP addresses or MAC addresses. / Não inclua tokens, senhas, IPs ou endereços MAC."
+  - type: input
+    id: integration
+    attributes:
+      label: Integration version / Versão da integração
+    validations:
+      required: true
+  - type: input
+    id: homeassistant
+    attributes:
+      label: Home Assistant Core version / Versão do Core
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Product, module and firmware / Produto, módulo e firmware
+      placeholder: "605568, ESP25_MHORGB_01, 1.38.0"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected and actual result / Passos, resultado esperado e observado
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs / Logs sem dados privados
+      render: text

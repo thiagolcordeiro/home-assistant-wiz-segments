@@ -1,0 +1,9 @@
+name: Feature request / Sugerir recurso
+description: Describe your use case / Descreva seu caso de uso
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: Use case and proposed behavior / Caso de uso e comportamento proposto
+    validations:
+      required: true
